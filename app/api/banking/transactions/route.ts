@@ -6,17 +6,17 @@ export async function GET() {
     const query = `
       SELECT 
         bt.*,
-        ba.bank_name,
-        ba.account_number
-      FROM bank_transactions bt
-      LEFT JOIN bank_accounts ba ON bt.account_id = ba.id
-      ORDER BY bt.transaction_date DESC, bt.id DESC
+        ba.account_name,
+        ba.bank_name
+      FROM banking_transactions bt
+      LEFT JOIN banking_accounts ba ON bt.account_id = ba.id
+      ORDER BY bt.transaction_date DESC, bt.created_at DESC
     `
     const transactions = await executeQuery(query)
-    return NextResponse.json(transactions)
+    return NextResponse.json(Array.isArray(transactions) ? transactions : [])
   } catch (error) {
-    console.error("Error fetching bank transactions:", error)
-    return NextResponse.json({ error: "Failed to fetch bank transactions" }, { status: 500 })
+    console.error("Banking transactions fetch error:", error)
+    return NextResponse.json({ error: "Failed to fetch banking transactions" }, { status: 500 })
   }
 }
 
@@ -24,40 +24,68 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const {
-      account_id = 1,
-      transaction_date,
-      value_date,
-      type,
+      account_id,
+      transaction_type,
+      amount,
       description,
-      reference_no,
-      debit = 0,
-      credit = 0,
-      balance_after = 0,
-      accounting_code,
+      transaction_date,
+      reference_number,
+      category,
+      project_id,
+      status = "completed",
     } = body
 
-    const query = `
-      INSERT INTO bank_transactions 
-      (account_id, transaction_date, value_date, type, description, reference_no, debit, credit, balance_after, accounting_code)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `
-    const params = [
-      account_id,
-      transaction_date,
-      value_date,
-      type,
-      description,
-      reference_no,
-      debit,
-      credit,
-      balance_after,
-      accounting_code,
-    ]
+    // Start transaction
+    await executeQuery("START TRANSACTION")
 
-    await executeQuery(query, params)
-    return NextResponse.json({ message: "Bank transaction created successfully" }, { status: 201 })
+    try {
+      // Insert transaction
+      const result = await executeQuery(
+        `
+        INSERT INTO banking_transactions (
+          account_id, transaction_type, amount, description, transaction_date,
+          reference_number, category, project_id, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+        [
+          account_id,
+          transaction_type,
+          amount,
+          description,
+          transaction_date,
+          reference_number,
+          category,
+          project_id,
+          status,
+        ],
+      )
+
+      // Update account balance
+      const balanceChange = transaction_type === "income" ? amount : -amount
+      await executeQuery(
+        `
+        UPDATE banking_accounts 
+        SET balance = balance + ? 
+        WHERE id = ?
+      `,
+        [balanceChange, account_id],
+      )
+
+      await executeQuery("COMMIT")
+
+      return NextResponse.json(
+        {
+          id: result.insertId,
+          message: "Banking transaction created successfully",
+        },
+        { status: 201 },
+      )
+    } catch (error) {
+      await executeQuery("ROLLBACK")
+      throw error
+    }
   } catch (error) {
-    console.error("Error creating bank transaction:", error)
-    return NextResponse.json({ error: "Failed to create bank transaction" }, { status: 500 })
+    console.error("Banking transaction creation error:", error)
+    return NextResponse.json({ error: "Failed to create banking transaction" }, { status: 500 })
   }
 }

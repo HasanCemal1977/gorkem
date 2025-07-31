@@ -3,20 +3,20 @@ import { executeQuery } from "@/lib/db"
 
 export async function GET() {
   try {
-    const query = `
+    const receipts = await executeQuery(`
       SELECT 
-        r.*,
-        ba.bank_name,
-        ba.account_number
-      FROM receipts r
-      LEFT JOIN bank_accounts ba ON r.related_account_id = ba.id
-      ORDER BY r.receipt_date DESC, r.id DESC
-    `
-    const receipts = await executeQuery(query)
-    return NextResponse.json(receipts)
+        br.*,
+        ba.account_name,
+        ba.bank_name
+      FROM banking_receipts br
+      LEFT JOIN banking_accounts ba ON br.account_id = ba.id
+      ORDER BY br.receipt_date DESC, br.created_at DESC
+    `)
+
+    return NextResponse.json(Array.isArray(receipts) ? receipts : [])
   } catch (error) {
-    console.error("Error fetching receipts:", error)
-    return NextResponse.json({ error: "Failed to fetch receipts" }, { status: 500 })
+    console.error("Banking receipts fetch error:", error)
+    return NextResponse.json({ error: "Failed to fetch banking receipts" }, { status: 500 })
   }
 }
 
@@ -24,38 +24,36 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const {
-      company_id = 1,
-      receipt_date,
+      account_id,
       receipt_type,
-      payment_method,
-      related_account_id = 1,
+      receipt_number,
       amount,
-      payer_name,
+      receipt_date,
+      payer,
       description,
-      accounting_code,
+      project_id,
+      status = "received",
     } = body
 
-    const query = `
-      INSERT INTO receipts 
-      (company_id, receipt_date, receipt_type, payment_method, related_account_id, amount, payer_name, description, accounting_code)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `
-    const params = [
-      company_id,
-      receipt_date,
-      receipt_type,
-      payment_method,
-      related_account_id,
-      amount,
-      payer_name,
-      description,
-      accounting_code,
-    ]
+    const result = await executeQuery(
+      `
+      INSERT INTO banking_receipts (
+        account_id, receipt_type, receipt_number, amount, receipt_date,
+        payer, description, project_id, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+      [account_id, receipt_type, receipt_number, amount, receipt_date, payer, description, project_id, status],
+    )
 
-    await executeQuery(query, params)
-    return NextResponse.json({ message: "Receipt created successfully" }, { status: 201 })
+    return NextResponse.json(
+      {
+        id: result.insertId,
+        message: "Banking receipt created successfully",
+      },
+      { status: 201 },
+    )
   } catch (error) {
-    console.error("Error creating receipt:", error)
-    return NextResponse.json({ error: "Failed to create receipt" }, { status: 500 })
+    console.error("Banking receipt creation error:", error)
+    return NextResponse.json({ error: "Failed to create banking receipt" }, { status: 500 })
   }
 }

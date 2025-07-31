@@ -1,40 +1,88 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { executeQuery } from "@/lib/db"
 
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const loans = await executeQuery(
+      `
+      SELECT 
+        bl.*,
+        ba.account_name,
+        ba.bank_name
+      FROM banking_loans bl
+      LEFT JOIN banking_accounts ba ON bl.account_id = ba.id
+      WHERE bl.id = ?
+    `,
+      [params.id],
+    )
+
+    if (!Array.isArray(loans) || loans.length === 0) {
+      return NextResponse.json({ error: "Banking loan not found" }, { status: 404 })
+    }
+
+    return NextResponse.json(loans[0])
+  } catch (error) {
+    console.error("Banking loan fetch error:", error)
+    return NextResponse.json({ error: "Failed to fetch banking loan" }, { status: 500 })
+  }
+}
+
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await request.json()
-    const { loan_type, loan_amount, start_date, maturity_date, interest_rate, remaining_balance } = body
-    const id = params.id
+    const {
+      account_id,
+      loan_type,
+      principal_amount,
+      interest_rate,
+      term_months,
+      start_date,
+      monthly_payment,
+      remaining_balance,
+      status,
+      description,
+      guarantor,
+      collateral,
+    } = body
 
-    const query = `
-      UPDATE bank_loans 
-      SET loan_type = ?, loan_amount = ?, start_date = ?, maturity_date = ?, interest_rate = ?, remaining_balance = ?
+    await executeQuery(
+      `
+      UPDATE banking_loans SET
+        account_id = ?, loan_type = ?, principal_amount = ?, interest_rate = ?,
+        term_months = ?, start_date = ?, monthly_payment = ?, remaining_balance = ?,
+        status = ?, description = ?, guarantor = ?, collateral = ?
       WHERE id = ?
-    `
-    const queryParams = [loan_type, loan_amount, start_date, maturity_date, interest_rate, remaining_balance, id]
+    `,
+      [
+        account_id,
+        loan_type,
+        principal_amount,
+        interest_rate,
+        term_months,
+        start_date,
+        monthly_payment,
+        remaining_balance,
+        status,
+        description,
+        guarantor,
+        collateral,
+        params.id,
+      ],
+    )
 
-    await executeQuery(query, queryParams)
-    return NextResponse.json({ message: "Bank loan updated successfully" })
+    return NextResponse.json({ message: "Banking loan updated successfully" })
   } catch (error) {
-    console.error("Error updating bank loan:", error)
-    return NextResponse.json({ error: "Failed to update bank loan" }, { status: 500 })
+    console.error("Banking loan update error:", error)
+    return NextResponse.json({ error: "Failed to update banking loan" }, { status: 500 })
   }
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const id = params.id
-
-    // First delete related payments
-    await executeQuery("DELETE FROM loan_payments WHERE loan_id = ?", [id])
-
-    // Then delete the loan
-    await executeQuery("DELETE FROM bank_loans WHERE id = ?", [id])
-
-    return NextResponse.json({ message: "Bank loan deleted successfully" })
+    await executeQuery(`DELETE FROM banking_loans WHERE id = ?`, [params.id])
+    return NextResponse.json({ message: "Banking loan deleted successfully" })
   } catch (error) {
-    console.error("Error deleting bank loan:", error)
-    return NextResponse.json({ error: "Failed to delete bank loan" }, { status: 500 })
+    console.error("Banking loan deletion error:", error)
+    return NextResponse.json({ error: "Failed to delete banking loan" }, { status: 500 })
   }
 }

@@ -1,34 +1,73 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { executeQuery } from "@/lib/db"
 
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const checks = await executeQuery(
+      `
+      SELECT 
+        bc.*,
+        ba.account_name,
+        ba.bank_name
+      FROM banking_checks bc
+      LEFT JOIN banking_accounts ba ON bc.account_id = ba.id
+      WHERE bc.id = ?
+    `,
+      [params.id],
+    )
+
+    if (!Array.isArray(checks) || checks.length === 0) {
+      return NextResponse.json({ error: "Banking check not found" }, { status: 404 })
+    }
+
+    return NextResponse.json(checks[0])
+  } catch (error) {
+    console.error("Banking check fetch error:", error)
+    return NextResponse.json({ error: "Failed to fetch banking check" }, { status: 500 })
+  }
+}
+
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await request.json()
-    const { check_number, drawer, check_date, due_date, amount, status, description, accounting_code } = body
-    const id = params.id
+    const { account_id, check_type, check_number, amount, issue_date, due_date, payee, drawer, status, description } =
+      body
 
-    const query = `
-      UPDATE checks 
-      SET check_number = ?, drawer = ?, check_date = ?, due_date = ?, amount = ?, status = ?, description = ?, accounting_code = ?
+    await executeQuery(
+      `
+      UPDATE banking_checks SET
+        account_id = ?, check_type = ?, check_number = ?, amount = ?,
+        issue_date = ?, due_date = ?, payee = ?, drawer = ?, status = ?, description = ?
       WHERE id = ?
-    `
-    const queryParams = [check_number, drawer, check_date, due_date, amount, status, description, accounting_code, id]
+    `,
+      [
+        account_id,
+        check_type,
+        check_number,
+        amount,
+        issue_date,
+        due_date,
+        payee,
+        drawer,
+        status,
+        description,
+        params.id,
+      ],
+    )
 
-    await executeQuery(query, queryParams)
-    return NextResponse.json({ message: "Check updated successfully" })
+    return NextResponse.json({ message: "Banking check updated successfully" })
   } catch (error) {
-    console.error("Error updating check:", error)
-    return NextResponse.json({ error: "Failed to update check" }, { status: 500 })
+    console.error("Banking check update error:", error)
+    return NextResponse.json({ error: "Failed to update banking check" }, { status: 500 })
   }
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const id = params.id
-    await executeQuery("DELETE FROM checks WHERE id = ?", [id])
-    return NextResponse.json({ message: "Check deleted successfully" })
+    await executeQuery(`DELETE FROM banking_checks WHERE id = ?`, [params.id])
+    return NextResponse.json({ message: "Banking check deleted successfully" })
   } catch (error) {
-    console.error("Error deleting check:", error)
-    return NextResponse.json({ error: "Failed to delete check" }, { status: 500 })
+    console.error("Banking check deletion error:", error)
+    return NextResponse.json({ error: "Failed to delete banking check" }, { status: 500 })
   }
 }

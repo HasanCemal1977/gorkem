@@ -3,46 +3,73 @@ import { executeQuery } from "@/lib/db"
 
 export async function GET() {
   try {
-    const query = `
+    const loans = await executeQuery(`
       SELECT 
         bl.*,
-        ba.bank_name,
-        ba.account_number
-      FROM bank_loans bl
-      LEFT JOIN bank_accounts ba ON bl.account_id = ba.id
-      ORDER BY bl.id DESC
-    `
-    const loans = await executeQuery(query)
-    return NextResponse.json(loans)
+        ba.account_name,
+        ba.bank_name
+      FROM banking_loans bl
+      LEFT JOIN banking_accounts ba ON bl.account_id = ba.id
+      ORDER BY bl.created_at DESC
+    `)
+
+    return NextResponse.json(Array.isArray(loans) ? loans : [])
   } catch (error) {
-    console.error("Error fetching bank loans:", error)
-    return NextResponse.json({ error: "Failed to fetch bank loans" }, { status: 500 })
+    console.error("Banking loans fetch error:", error)
+    return NextResponse.json({ error: "Failed to fetch banking loans" }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { account_id = 1, loan_type, loan_amount, start_date, maturity_date, interest_rate, remaining_balance } = body
-
-    const query = `
-      INSERT INTO bank_loans (account_id, loan_type, loan_amount, start_date, maturity_date, interest_rate, remaining_balance)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `
-    const params = [
+    const {
       account_id,
       loan_type,
-      loan_amount,
-      start_date,
-      maturity_date,
+      principal_amount,
       interest_rate,
-      remaining_balance || loan_amount,
-    ]
+      term_months,
+      start_date,
+      monthly_payment,
+      remaining_balance,
+      status = "active",
+      description,
+      guarantor,
+      collateral,
+    } = body
 
-    await executeQuery(query, params)
-    return NextResponse.json({ message: "Bank loan created successfully" }, { status: 201 })
+    const result = await executeQuery(
+      `
+      INSERT INTO banking_loans (
+        account_id, loan_type, principal_amount, interest_rate, term_months,
+        start_date, monthly_payment, remaining_balance, status, description, guarantor, collateral
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+      [
+        account_id,
+        loan_type,
+        principal_amount,
+        interest_rate,
+        term_months,
+        start_date,
+        monthly_payment,
+        remaining_balance,
+        status,
+        description,
+        guarantor,
+        collateral,
+      ],
+    )
+
+    return NextResponse.json(
+      {
+        id: result.insertId,
+        message: "Banking loan created successfully",
+      },
+      { status: 201 },
+    )
   } catch (error) {
-    console.error("Error creating bank loan:", error)
-    return NextResponse.json({ error: "Failed to create bank loan" }, { status: 500 })
+    console.error("Banking loan creation error:", error)
+    return NextResponse.json({ error: "Failed to create banking loan" }, { status: 500 })
   }
 }

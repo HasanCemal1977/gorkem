@@ -1,226 +1,337 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   Building2,
   Users,
+  Package,
   Calculator,
   CreditCard,
   ShoppingCart,
   FileText,
   Shield,
-  Package,
-  Calendar,
-  BarChart3,
+  LogOut,
+  User,
   TrendingUp,
-  AlertTriangle,
+  AlertCircle,
   CheckCircle,
 } from "lucide-react"
-import Link from "next/link"
 
-export default function Dashboard() {
+interface User {
+  id: number
+  username: string
+  email: string
+  fullName: string
+  department: string
+  roles: Array<{ name: string; description: string }>
+  permissions: Array<{ name: string; module: string }>
+}
+
+export default function HomePage() {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const router = useRouter()
+
+  useEffect(() => {
+    checkAuth()
+  }, [])
+
+  const checkAuth = async () => {
+    try {
+      const response = await fetch("/api/auth/me")
+
+      if (response.ok) {
+        const data = await response.json()
+        setUser(data.user)
+      } else {
+        router.push("/login")
+      }
+    } catch (error) {
+      router.push("/login")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" })
+      router.push("/login")
+    } catch (error) {
+      console.error("Logout error:", error)
+    }
+  }
+
+  const hasPermission = (permission: string) => {
+    return user?.permissions.some((p) => p.name === permission) || false
+  }
+
+  const isAdmin = () => {
+    return user?.roles.some((r) => r.name === "Admin") || false
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p>Yükleniyor...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
+
   const modules = [
     {
-      title: "Genel Muhasebe",
-      description: "Temel muhasebe işlemleri ve finansal raporlama",
-      icon: Calculator,
-      href: "/accounting",
+      title: "Projeler",
+      description: "Proje yönetimi ve takibi",
+      icon: Building2,
+      href: "/projects",
+      permission: "project_view",
       color: "bg-blue-500",
-      isCore: true,
     },
     {
-      title: "Taşeron Yönetimi",
-      description: "Taşeron sözleşmeleri ve ödeme takibi",
-      icon: Users,
-      href: "/subcontractors",
+      title: "Stok & Envanter",
+      description: "Stok takibi ve envanter yönetimi",
+      icon: Package,
+      href: "/inventory",
+      permission: "inventory_view",
       color: "bg-green-500",
     },
     {
-      title: "Proje Yönetimi",
-      description: "Şantiye bazlı finansal yönetim",
-      icon: Building2,
-      href: "/projects",
+      title: "Genel Muhasebe",
+      description: "Muhasebe kayıtları ve raporları",
+      icon: Calculator,
+      href: "/accounting",
+      permission: "accounting_view",
       color: "bg-purple-500",
     },
     {
-      title: "Banka & Krediler",
-      description: "Banka hesapları ve kredi yönetimi",
+      title: "Bankacılık",
+      description: "Banka hesapları ve işlemleri",
       icon: CreditCard,
       href: "/banking",
-      color: "bg-red-500",
-    },
-    {
-      title: "Satın Alma & İhale",
-      description: "Tedarikçi yönetimi ve ihale süreçleri",
-      icon: ShoppingCart,
-      href: "/procurement",
-      color: "bg-orange-500",
-    },
-    {
-      title: "Ödemeler & Borçlar",
-      description: "Ödeme planları ve borç takibi",
-      icon: FileText,
-      href: "/payments",
-      color: "bg-yellow-500",
-    },
-    {
-      title: "Teminat Mektupları",
-      description: "Teminat mektupları ve komisyon takibi",
-      icon: Shield,
-      href: "/guarantees",
+      permission: "banking_view",
       color: "bg-indigo-500",
     },
     {
-      title: "Sipariş & Stok",
-      description: "Malzeme siparişleri ve stok yönetimi",
-      icon: Package,
-      href: "/inventory",
-      color: "bg-pink-500",
+      title: "Ödemeler",
+      description: "Ödeme planları ve takibi",
+      icon: FileText,
+      href: "/payments",
+      permission: "payment_view",
+      color: "bg-orange-500",
     },
     {
-      title: "Ödeme Planları",
-      description: "Uzun vadeli ödeme planları ve amortisman",
-      icon: Calendar,
-      href: "/payment-plans",
+      title: "Satın Alma & İhale",
+      description: "Tedarikçi ve satın alma yönetimi",
+      icon: ShoppingCart,
+      href: "/procurement",
+      permission: "procurement_view",
+      color: "bg-red-500",
+    },
+    {
+      title: "Taşeronlar",
+      description: "Taşeron firma yönetimi",
+      icon: Users,
+      href: "/subcontractors",
+      permission: "project_view",
       color: "bg-teal-500",
-    },
-    {
-      title: "Raporlama & Analiz",
-      description: "Kapsamlı raporlar ve performans analizi",
-      icon: BarChart3,
-      href: "/reports",
-      color: "bg-cyan-500",
     },
   ]
 
-  const stats = [
-    {
-      title: "Aktif Projeler",
-      value: "12",
-      change: "+2",
-      icon: Building2,
-      color: "text-blue-600",
-    },
-    {
-      title: "Toplam Ciro",
-      value: "₺2.4M",
-      change: "+15%",
-      icon: TrendingUp,
-      color: "text-green-600",
-    },
-    {
-      title: "Bekleyen Ödemeler",
-      value: "₺340K",
-      change: "-8%",
-      icon: AlertTriangle,
-      color: "text-orange-600",
-    },
-    {
-      title: "Tamamlanan İşler",
-      value: "28",
-      change: "+4",
-      icon: CheckCircle,
-      color: "text-purple-600",
-    },
-  ]
+  const availableModules = modules.filter((module) => hasPermission(module.permission))
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
-              <Building2 className="h-8 w-8 text-blue-600 mr-3" />
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Building2 className="h-8 w-8 text-blue-600" />
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">İnşaat Yönetim Sistemi</h1>
-                <p className="text-sm text-gray-500">Modüler İnşaat Firması Yönetim Yazılımı</p>
+                <h1 className="text-xl font-bold text-gray-900">İnşaat Yönetim Sistemi</h1>
+                <p className="text-sm text-gray-600">Hoş geldiniz, {user.fullName}</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <Button variant="outline">Ayarlar</Button>
-              <Button>Yeni Proje</Button>
+
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-900">{user.fullName}</p>
+                <div className="flex gap-1">
+                  {user.roles.map((role) => (
+                    <Badge key={role.name} variant="outline" className="text-xs">
+                      {role.name}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                {isAdmin() && (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/admin">
+                      <Shield className="h-4 w-4 mr-2" />
+                      Yönetici Paneli
+                    </Link>
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Çıkış
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {stats.map((stat, index) => (
-            <Card key={index}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">{stat.title}</p>
-                    <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                    <p
-                      className={`text-sm ${stat.change.startsWith("+") ? "text-green-600" : stat.change.startsWith("-") ? "text-red-600" : "text-gray-600"}`}
-                    >
-                      {stat.change} bu ay
-                    </p>
-                  </div>
-                  <stat.icon className={`h-8 w-8 ${stat.color}`} />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      {/* Main Content */}
+      <main className="container mx-auto px-6 py-8">
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-        {/* Modules Grid */}
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Sistem Modülleri</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {modules.map((module, index) => (
-              <Link key={index} href={module.href}>
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className={`p-2 rounded-lg ${module.color} text-white`}>
-                        <module.icon className="h-6 w-6" />
-                      </div>
-                      {module.isCore && (
-                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">Temel Modül</span>
-                      )}
-                    </div>
-                    <CardTitle className="text-lg">{module.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-sm">{module.description}</CardDescription>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <Card>
+        {/* Welcome Card */}
+        <Card className="mb-8">
           <CardHeader>
-            <CardTitle>Hızlı İşlemler</CardTitle>
-            <CardDescription>Sık kullanılan işlemlere hızlı erişim</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Kullanıcı Bilgileri
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Button variant="outline" className="h-20 flex-col bg-transparent">
-                <FileText className="h-6 w-6 mb-2" />
-                Yeni Fatura
-              </Button>
-              <Button variant="outline" className="h-20 flex-col bg-transparent">
-                <Users className="h-6 w-6 mb-2" />
-                Taşeron Ekle
-              </Button>
-              <Button variant="outline" className="h-20 flex-col bg-transparent">
-                <CreditCard className="h-6 w-6 mb-2" />
-                Ödeme Yap
-              </Button>
-              <Button variant="outline" className="h-20 flex-col bg-transparent">
-                <BarChart3 className="h-6 w-6 mb-2" />
-                Rapor Oluştur
-              </Button>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-sm text-gray-600">Kullanıcı Adı</p>
+                <p className="font-medium">{user.username}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">E-posta</p>
+                <p className="font-medium">{user.email}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Departman</p>
+                <p className="font-medium">{user.department}</p>
+              </div>
             </div>
           </CardContent>
         </Card>
+
+        {/* Modules Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {availableModules.map((module) => {
+            const IconComponent = module.icon
+            return (
+              <Card key={module.href} className="hover:shadow-lg transition-shadow cursor-pointer">
+                <Link href={module.href}>
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${module.color}`}>
+                        <IconComponent className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">{module.title}</CardTitle>
+                        <CardDescription>{module.description}</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Link>
+              </Card>
+            )
+          })}
+        </div>
+
+        {availableModules.length === 0 && (
+          <Card>
+            <CardContent className="text-center py-12">
+              <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Erişim Yetkisi Yok</h3>
+              <p className="text-gray-600">
+                Herhangi bir modüle erişim yetkiniz bulunmamaktadır. Lütfen sistem yöneticisi ile iletişime geçin.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Quick Stats for Admin */}
+        {isAdmin() && (
+          <div className="mt-8">
+            <h2 className="text-xl font-bold mb-4">Sistem Özeti</h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Users className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Aktif Kullanıcı</p>
+                      <p className="text-xl font-bold">4</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <Building2 className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Aktif Proje</p>
+                      <p className="text-xl font-bold">12</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-100 rounded-lg">
+                      <TrendingUp className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Bu Ay Ciro</p>
+                      <p className="text-xl font-bold">₺2.4M</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-orange-100 rounded-lg">
+                      <CheckCircle className="h-5 w-5 text-orange-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Tamamlanan</p>
+                      <p className="text-xl font-bold">8</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )

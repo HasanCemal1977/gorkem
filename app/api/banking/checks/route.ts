@@ -3,20 +3,20 @@ import { executeQuery } from "@/lib/db"
 
 export async function GET() {
   try {
-    const query = `
+    const checks = await executeQuery(`
       SELECT 
-        c.*,
-        ba.bank_name,
-        ba.account_number
-      FROM checks c
-      LEFT JOIN bank_accounts ba ON c.bank_account_id = ba.id
-      ORDER BY c.due_date DESC, c.id DESC
-    `
-    const checks = await executeQuery(query)
-    return NextResponse.json(checks)
+        bc.*,
+        ba.account_name,
+        ba.bank_name
+      FROM banking_checks bc
+      LEFT JOIN banking_accounts ba ON bc.account_id = ba.id
+      ORDER BY bc.due_date DESC, bc.created_at DESC
+    `)
+
+    return NextResponse.json(Array.isArray(checks) ? checks : [])
   } catch (error) {
-    console.error("Error fetching checks:", error)
-    return NextResponse.json({ error: "Failed to fetch checks" }, { status: 500 })
+    console.error("Banking checks fetch error:", error)
+    return NextResponse.json({ error: "Failed to fetch banking checks" }, { status: 500 })
   }
 }
 
@@ -24,40 +24,37 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const {
-      company_id = 1,
-      bank_account_id = 1,
+      account_id,
+      check_type,
       check_number,
-      drawer,
-      check_date,
-      due_date,
       amount,
-      status = "Giriş",
+      issue_date,
+      due_date,
+      payee,
+      drawer,
+      status = "pending",
       description,
-      accounting_code,
     } = body
 
-    const query = `
-      INSERT INTO checks 
-      (company_id, bank_account_id, check_number, drawer, check_date, due_date, amount, status, description, accounting_code)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `
-    const params = [
-      company_id,
-      bank_account_id,
-      check_number,
-      drawer,
-      check_date,
-      due_date,
-      amount,
-      status,
-      description,
-      accounting_code,
-    ]
+    const result = await executeQuery(
+      `
+      INSERT INTO banking_checks (
+        account_id, check_type, check_number, amount, issue_date,
+        due_date, payee, drawer, status, description
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+      [account_id, check_type, check_number, amount, issue_date, due_date, payee, drawer, status, description],
+    )
 
-    await executeQuery(query, params)
-    return NextResponse.json({ message: "Check created successfully" }, { status: 201 })
+    return NextResponse.json(
+      {
+        id: result.insertId,
+        message: "Banking check created successfully",
+      },
+      { status: 201 },
+    )
   } catch (error) {
-    console.error("Error creating check:", error)
-    return NextResponse.json({ error: "Failed to create check" }, { status: 500 })
+    console.error("Banking check creation error:", error)
+    return NextResponse.json({ error: "Failed to create banking check" }, { status: 500 })
   }
 }
